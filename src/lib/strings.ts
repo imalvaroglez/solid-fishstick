@@ -161,11 +161,13 @@ export const STRINGS = {
   },
 
   auth: {
-    signIn: "Iniciar sesión con Google",
+    email: "Correo",
+    password: "Contraseña",
+    signIn: "Iniciar sesión",
     signingIn: "Iniciando sesión...",
+    signInError: "No se pudo iniciar sesión. Revisa el correo y la contraseña.",
     denied: "Acceso no permitido",
-    deniedHint:
-      "Esta cuenta no tiene permiso para administrar el catálogo. Cierra sesión e inicia con una cuenta autorizada.",
+    deniedHint: "Esta cuenta no tiene permiso para administrar el catálogo.",
     signOut: "Cerrar sesión",
   },
 

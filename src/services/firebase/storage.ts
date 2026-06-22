@@ -6,6 +6,7 @@ import {
   type FirebaseStorage,
 } from "firebase/storage";
 import { getFirebase } from "./app";
+import { rethrowFirebaseError } from "./diagnostics";
 import { id } from "../../lib/ids";
 
 let cached: FirebaseStorage | null = null;
@@ -60,7 +61,11 @@ export const uploadProductImage = async (
   const blob = await resizeImage(file);
   const imagePath = `product-images/${productId}/${id()}.jpg`;
   const storageRef = ref(storage(), imagePath);
-  await uploadBytes(storageRef, blob, { contentType: "image/jpeg" });
-  const imageUrl = await getDownloadURL(storageRef);
-  return { imageUrl, imagePath };
+  try {
+    await uploadBytes(storageRef, blob, { contentType: "image/jpeg" });
+    const imageUrl = await getDownloadURL(storageRef);
+    return { imageUrl, imagePath };
+  } catch (error) {
+    return rethrowFirebaseError("upload", "product-images", imagePath, error);
+  }
 };

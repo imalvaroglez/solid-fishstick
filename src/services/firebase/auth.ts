@@ -1,7 +1,6 @@
 import {
   getAuth,
-  GoogleAuthProvider,
-  signInWithPopup,
+  signInWithEmailAndPassword,
   signOut,
   type Auth,
 } from "firebase/auth";
@@ -25,10 +24,11 @@ export const ADMIN_EMAILS: string[] = (import.meta.env.VITE_ADMIN_EMAILS ?? "")
 export const isAdminEmail = (email?: string | null): boolean =>
   Boolean(email && ADMIN_EMAILS.includes(email.trim().toLowerCase()));
 
-const provider = new GoogleAuthProvider();
-
-export const signInWithGoogle = async (): Promise<void> => {
-  await signInWithPopup(auth(), provider);
+export const signInWithEmail = async (
+  email: string,
+  password: string,
+): Promise<void> => {
+  await signInWithEmailAndPassword(auth(), email, password);
 };
 
 export const signOutAdmin = async (): Promise<void> => {

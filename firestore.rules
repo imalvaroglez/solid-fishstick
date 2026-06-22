@@ -7,23 +7,17 @@ rules_version = '2';
 //
 // Firebase rules run server-side and CANNOT read Vite env vars, so the admin
 // list must be written here explicitly.
-//
-// Upgrade path: instead of the email list, set an `admin` custom claim via the
-// Firebase Admin SDK and use  request.auth.token.admin == true  in isAdmin().
 // ============================================================================
 
-service firebase.firestore {
+service cloud.firestore {
   match /databases/{db}/documents {
 
-    // Admin Google account emails — keep in sync with VITE_ADMIN_EMAILS
+    // Admin Email/Password accounts — keep in sync with VITE_ADMIN_EMAILS
     // (Firebase rules cannot read client env vars at runtime).
-    // ponytail: regex `(?i)` instead of a plain `in [...]` list because the
-    // `in` operator is case-SENSITIVE and Google may return a differently-
-    // cased email than the one stored here, causing silent permission-denied.
     function isAdmin() {
       return request.auth != null
       && request.auth.token.email in [
-        "imalvaroglez@gmail.com"
+        "REPLACE_WITH_ADMIN_EMAIL@example.com"
       ];
     }
 
@@ -41,6 +35,10 @@ service firebase.firestore {
     match /publicCatalogProducts/{id} {
       allow read:  if true;
       allow write: if isAdmin();
+    }
+
+    match /{document=**} {
+      allow read, write: if false;
     }
   }
 }

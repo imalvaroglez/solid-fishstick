@@ -4,7 +4,6 @@ import {
   collection,
   onSnapshot,
   query,
-  where,
   orderBy,
   type Unsubscribe,
 } from "firebase/firestore";
@@ -26,11 +25,12 @@ type Listener = (state: PublicCatalogState) => void;
 // rather than masquerading as an empty list.
 export const subscribe = (cb: Listener): Unsubscribe =>
   onSnapshot(
-    query(
-      collection(db(), COL),
-      where("isPublic", "==", true),
-      orderBy("updatedAt", "desc")
-    ),
+    query(collection(db(), COL), orderBy("updatedAt", "desc")),
     (snap) => cb({ status: "ready", products: snap.docs.map((d) => d.data() as PublicCatalogProduct) }),
-    () => cb({ status: "error" })
+    (error) => {
+      if (import.meta.env.DEV) {
+        console.error("[Firebase public catalog failed]", error.code, error.message);
+      }
+      cb({ status: "error" });
+    }
   );

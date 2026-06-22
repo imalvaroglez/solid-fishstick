@@ -12,6 +12,7 @@ import {
   type Unsubscribe,
 } from "firebase/firestore";
 import { db } from "../firebase/firestore";
+import { rethrowFirebaseError } from "../firebase/diagnostics";
 import type { Product, PublicCatalogProduct } from "../../types";
 
 const COL = "products";
@@ -42,15 +43,24 @@ export const subscribe = (cb: ProductListener): Unsubscribe =>
 
 // Batched: write private doc + upsert/delete the public projection.
 export const save = async (product: Product): Promise<void> => {
-  const batch = writeBatch(db());
-  batch.set(doc(db(), COL, product.id), product);
-  const publicRef = doc(db(), PUBLIC_COL, product.id);
-  if (product.isPublic) {
-    batch.set(publicRef, toPublic(product));
-  } else {
-    batch.delete(publicRef);
+  try {
+    const batch = writeBatch(db());
+    batch.set(doc(db(), COL, product.id), product);
+    const publicRef = doc(db(), PUBLIC_COL, product.id);
+    if (product.isPublic) {
+      batch.set(publicRef, toPublic(product));
+    } else {
+      batch.delete(publicRef);
+    }
+    await batch.commit();
+  } catch (error) {
+    rethrowFirebaseError(
+      "save private/public projection",
+      `${COL},${PUBLIC_COL}`,
+      product.id,
+      error
+    );
   }
-  await batch.commit();
 };
 
 // Non-destructive import: skip ids that already exist. Firestore `in` is capped

@@ -12,6 +12,7 @@ import {
   type Unsubscribe,
 } from "firebase/firestore";
 import { db } from "../firebase/firestore";
+import { rethrowFirebaseError } from "../firebase/diagnostics";
 import type { Customer } from "../../types";
 
 const COL = "customers";
@@ -26,7 +27,11 @@ export const subscribe = (cb: Listener): Unsubscribe =>
   );
 
 export const save = async (customer: Customer): Promise<void> => {
-  await importCustomers([customer]);
+  try {
+    await importCustomers([customer]);
+  } catch (error) {
+    rethrowFirebaseError("save", COL, customer.id, error);
+  }
 };
 
 // Non-destructive: skip ids that already exist.
