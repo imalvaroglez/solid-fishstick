@@ -1,0 +1,36 @@
+rules_version = '2';
+
+// ============================================================================
+// Product images: admin-only write. Public users read via signed download URL
+// (getDownloadURL) — that URL carries a token that bypasses the path-level
+// read check, so `allow read: if false` here is correct and still lets the
+// public catalog render images.
+//
+// Storage rules CANNOT import Firestore or read Vite env vars, so isAdmin()
+// must mirror the same admin email list as firestore.rules / VITE_ADMIN_EMAILS.
+// Replace the emails below before deploying:
+//   firebase deploy --only storage
+// ============================================================================
+
+service firebase.storage {
+  match /b/{bucket}/o {
+
+    // Admin Google account emails — keep in sync with VITE_ADMIN_EMAILS.
+    // ponytail: regex `(?i)` for case-insensitive match (see firestore.rules).
+    function isAdmin() {
+      return request.auth != null
+        && request.auth.token.email.matches('(?i)^imalvaroglez@gmail\\.com$');
+    }
+
+    // Product images: write only by admins; reads happen via signed URL.
+    match /product-images/{productId}/{allPaths=**} {
+      allow read:  if false;     // protected by signed download URL token
+      allow write: if request.auth != null && isAdmin();
+    }
+
+    // Deny everything else by default.
+    match /{allPaths=**} {
+      allow read, write: if false;
+    }
+  }
+}

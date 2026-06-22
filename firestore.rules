@@ -1,0 +1,44 @@
+rules_version = '2';
+
+// ============================================================================
+// ADVERTENCIA: NO deploy these in Firebase "test mode". Replace the email list
+// in isAdmin() below with the SAME addresses as VITE_ADMIN_EMAILS, then deploy:
+//   firebase deploy --only firestore:rules
+//
+// Firebase rules run server-side and CANNOT read Vite env vars, so the admin
+// list must be written here explicitly.
+//
+// Upgrade path: instead of the email list, set an `admin` custom claim via the
+// Firebase Admin SDK and use  request.auth.token.admin == true  in isAdmin().
+// ============================================================================
+
+service firebase.firestore {
+  match /databases/{db}/documents {
+
+    // Admin Google account emails — keep in sync with VITE_ADMIN_EMAILS
+    // (Firebase rules cannot read client env vars at runtime).
+    // ponytail: regex `(?i)` instead of a plain `in [...]` list because the
+    // `in` operator is case-SENSITIVE and Google may return a differently-
+    // cased email than the one stored here, causing silent permission-denied.
+    function isAdmin() {
+      return request.auth != null
+        && request.auth.token.email.matches('(?i)^imalvaroglez@gmail\\.com$');
+    }
+
+    // Private admin collections — only allowed admins read/write.
+    match /products/{id}   { allow read, write: if isAdmin(); }
+    match /customers/{id}  { allow read, write: if isAdmin(); }
+    match /orders/{id}     { allow read, write: if isAdmin(); }
+
+    // Public catalog settings: anyone may read, only admins write.
+    match /settings/{id}   { allow read: if true; allow write: if isAdmin(); }
+
+    // Public catalog products: world-readable (this is what /catalogo reads),
+    // admin-write only. These docs must contain ONLY safe public fields
+    // (never cost/profit/private notes) — see productRepository.toPublic().
+    match /publicCatalogProducts/{id} {
+      allow read:  if true;
+      allow write: if isAdmin();
+    }
+  }
+}

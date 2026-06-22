@@ -1,0 +1,29 @@
+@import "tailwindcss";
+
+:root {
+  font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  -webkit-tap-highlight-color: transparent;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  background-color: #f7f7f8;
+  color: #1f2937;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Number inputs: hide spinners for a cleaner mobile feel */
+input[type="number"]::-webkit-outer-spin-button,
+input[type="number"]::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+input[type="number"] {
+  -moz-appearance: textfield;
+}
