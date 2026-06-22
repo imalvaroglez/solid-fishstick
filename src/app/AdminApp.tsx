@@ -1,5 +1,5 @@
 import { useCallback, useState } from "react";
-import type { Order, OrderStatus, Tab } from "../types";
+import type { OrderStatus, Tab } from "../types";
 import { useFirestoreStore } from "../hooks/useFirestoreStore";
 import { BottomNav } from "../components/BottomNav";
 import { FullScreen } from "../components/FullScreen";
