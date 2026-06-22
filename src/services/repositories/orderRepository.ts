@@ -13,6 +13,7 @@ import {
   type Unsubscribe,
 } from "firebase/firestore";
 import { db } from "../firebase/firestore";
+import { rethrowFirebaseError } from "../firebase/diagnostics";
 import type { Order, OrderStatus } from "../../types";
 
 const COL = "orders";
@@ -28,16 +29,24 @@ export const subscribe = (cb: Listener): Unsubscribe =>
 
 // Upsert a full order doc.
 export const save = async (order: Order): Promise<void> => {
-  await setDoc(doc(db(), COL, order.id), order);
+  try {
+    await setDoc(doc(db(), COL, order.id), order);
+  } catch (error) {
+    rethrowFirebaseError("save", COL, order.id, error);
+  }
 };
 
 // Advance an order's status (the single forward action).
 export const advance = async (orderId: string, nextStatus: OrderStatus): Promise<void> => {
-  await setDoc(
-    doc(db(), COL, orderId),
-    { status: nextStatus, updatedAt: new Date().toISOString() },
-    { merge: true }
-  );
+  try {
+    await setDoc(
+      doc(db(), COL, orderId),
+      { status: nextStatus, updatedAt: new Date().toISOString() },
+      { merge: true }
+    );
+  } catch (error) {
+    rethrowFirebaseError("advance", COL, orderId, error);
+  }
 };
 
 // Non-destructive import: skip ids that already exist.

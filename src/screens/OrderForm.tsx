@@ -68,13 +68,10 @@ export const OrderForm = ({ customers, products, onSave, onCancel }: Props) => {
       // On success the parent closes the form; clear busy defensively in case
       // the parent keeps the form mounted (e.g. onSave resolved but didn't unmount).
       setBusy(false);
-    } catch (e) {
+    } catch {
       // Keep entered values; surface error so the user can retry without retyping.
-      // Include Firebase's code (e.g. "permission-denied") when present — the
-      // generic message alone hides the real cause of save failures.
-      const code = (e as { code?: string }).code;
-      const msg = e instanceof Error && e.message ? e.message : STRINGS.errors.save;
-      setError(code ? `${msg} (${code})` : msg);
+      // Technical Firebase context is logged by the repository in development.
+      setError(STRINGS.errors.save);
       setBusy(false);
     }
   };

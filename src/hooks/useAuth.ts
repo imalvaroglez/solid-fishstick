@@ -2,7 +2,7 @@
 // to each emission so status never flickers between denied/admin.
 import { useEffect, useState } from "react";
 import { onAuthStateChanged, type User } from "firebase/auth";
-import { auth, signInWithGoogle, signOutAdmin, isAdminEmail } from "../services/firebase/auth";
+import { auth, signInWithEmail, signOutAdmin, isAdminEmail } from "../services/firebase/auth";
 import { FirebaseConfigError } from "../services/firebase/app";
 
 export type AuthStatus = "loading" | "signedOut" | "denied" | "admin";
@@ -10,7 +10,7 @@ export type AuthStatus = "loading" | "signedOut" | "denied" | "admin";
 export const useAuth = (): {
   status: AuthStatus;
   user: User | null;
-  signIn: () => Promise<void>;
+  signIn: (email: string, password: string) => Promise<void>;
   signOut: () => Promise<void>;
 } => {
   const [status, setStatus] = useState<AuthStatus>("loading");
@@ -36,7 +36,7 @@ export const useAuth = (): {
   return {
     status,
     user,
-    signIn: signInWithGoogle,
+    signIn: signInWithEmail,
     signOut: signOutAdmin,
   };
 };
