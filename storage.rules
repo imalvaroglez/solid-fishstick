@@ -19,7 +19,9 @@ service firebase.storage {
     // ponytail: regex `(?i)` for case-insensitive match (see firestore.rules).
     function isAdmin() {
       return request.auth != null
-        && request.auth.token.email.matches('(?i)^imalvaroglez@gmail\\.com$');
+      && request.auth.token.email in [
+        "imalvaroglez@gmail.com"
+      ];
     }
 
     // Product images: write only by admins; reads happen via signed URL.

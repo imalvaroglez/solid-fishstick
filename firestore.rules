@@ -22,7 +22,9 @@ service firebase.firestore {
     // cased email than the one stored here, causing silent permission-denied.
     function isAdmin() {
       return request.auth != null
-        && request.auth.token.email.matches('(?i)^imalvaroglez@gmail\\.com$');
+      && request.auth.token.email in [
+        "imalvaroglez@gmail.com"
+      ];
     }
 
     // Private admin collections — only allowed admins read/write.
