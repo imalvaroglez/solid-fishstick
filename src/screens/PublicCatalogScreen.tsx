@@ -72,6 +72,11 @@ export const PublicCatalogScreen = () => {
                     alt={p.name}
                     className="h-48 w-full object-cover"
                     loading="lazy"
+                    // ponytail: hide instead of retry — a 403 means the Storage
+                    // object is gone/stale; the real fix is clean data, not resilience.
+                    onError={(e) => {
+                      e.currentTarget.style.display = "none";
+                    }}
                   />
                 )}
                 <div className="p-4">
