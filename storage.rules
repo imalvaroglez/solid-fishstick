@@ -1,10 +1,11 @@
 rules_version = '2';
 
 // ============================================================================
-// Product images: admin-only write. Public users read via signed download URL
-// (getDownloadURL) — that URL carries a token that bypasses the path-level
-// read check, so `allow read: if false` here is correct and still lets the
-// public catalog render images.
+// Product images: admin-only read + write. getDownloadURL() (called by the
+// admin app after upload) issues a metadata GET gated by `allow read`, so
+// admins need read access to obtain the download URL. The returned URL carries
+// a token, which is what the public catalog uses to render images — anonymous
+// users never satisfy the read rule and cannot list or read objects directly.
 //
 // Storage rules CANNOT import Firestore or read Vite env vars, so isAdmin()
 // must mirror the same admin email list as firestore.rules / VITE_ADMIN_EMAILS.
@@ -21,9 +22,13 @@ service firebase.storage {
       ];
     }
 
-    // Product images: write only by admins; reads happen via signed URL.
+    // Product images: admin-only read/write. getDownloadURL() issues a metadata
+    // GET that is gated by `allow read`, so admins must be able to read to obtain
+    // the download URL. The URL it returns carries a token, so public catalog
+    // visitors fetch the image via that token WITHOUT needing the read rule —
+    // anonymous users still cannot list or read these objects directly.
     match /product-images/{productId}/{allPaths=**} {
-      allow read:  if false;     // protected by signed download URL token
+      allow read:  if isAdmin();
       allow write: if isAdmin();
     }
 
