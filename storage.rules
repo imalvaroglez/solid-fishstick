@@ -8,8 +8,6 @@ rules_version = '2';
 //
 // Storage rules CANNOT import Firestore or read Vite env vars, so isAdmin()
 // must mirror the same admin email list as firestore.rules / VITE_ADMIN_EMAILS.
-// Replace the emails below before deploying:
-//   firebase deploy --only storage
 // ============================================================================
 
 service firebase.storage {
@@ -19,7 +17,7 @@ service firebase.storage {
     function isAdmin() {
       return request.auth != null
       && request.auth.token.email in [
-        "REPLACE_WITH_ADMIN_EMAIL@example.com"
+        "admin@mail.com"
       ];
     }
 

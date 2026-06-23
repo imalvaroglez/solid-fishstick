@@ -1,12 +1,8 @@
 rules_version = '2';
 
 // ============================================================================
-// ADVERTENCIA: NO deploy these in Firebase "test mode". Replace the email list
-// in isAdmin() below with the SAME addresses as VITE_ADMIN_EMAILS, then deploy:
-//   firebase deploy --only firestore:rules
-//
 // Firebase rules run server-side and CANNOT read Vite env vars, so the admin
-// list must be written here explicitly.
+// list here must mirror VITE_ADMIN_EMAILS exactly.
 // ============================================================================
 
 service cloud.firestore {
@@ -17,7 +13,7 @@ service cloud.firestore {
     function isAdmin() {
       return request.auth != null
       && request.auth.token.email in [
-        "REPLACE_WITH_ADMIN_EMAIL@example.com"
+        "admin@mail.com"
       ];
     }
 
