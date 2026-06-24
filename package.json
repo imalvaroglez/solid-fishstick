@@ -5,8 +5,14 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
+    "dev:emulator": "VITE_USE_EMULATOR=1 VITE_FIREBASE_API_KEY=fake-key VITE_FIREBASE_AUTH_DOMAIN=demo-solid-fishstick.firebaseapp.com VITE_FIREBASE_PROJECT_ID=demo-solid-fishstick VITE_FIREBASE_STORAGE_BUCKET=demo-solid-fishstick.appspot.com VITE_FIREBASE_MESSAGING_SENDER_ID=123456789 VITE_FIREBASE_APP_ID=1:123456789:web:test VITE_ADMIN_EMAILS=admin@mail.com,estebanchavez1709@gmail.com VITE_LEGACY_ADMIN_UIDS='*' vite",
     "build": "tsc -b && vite build",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "emulators": "firebase emulators:start --project demo-solid-fishstick --only firestore,storage,auth",
+    "e2e": "playwright test",
+    "verify": "npm run build && CI=true firebase emulators:exec --project demo-solid-fishstick --only auth,firestore,storage \"npm run test && npm run e2e\""
   },
   "dependencies": {
     "@vercel/analytics": "^2.0.1",
@@ -17,12 +23,16 @@
     "react-router-dom": "^7.18.0"
   },
   "devDependencies": {
+    "@firebase/rules-unit-testing": "^5.0.1",
+    "@playwright/test": "^1.61.1",
     "@tailwindcss/vite": "^4.1.11",
     "@types/react": "^19.1.8",
     "@types/react-dom": "^19.1.6",
     "@vitejs/plugin-react": "^4.6.0",
+    "firebase-tools": "^13.35.1",
     "tailwindcss": "^4.1.11",
     "typescript": "~5.9.2",
-    "vite": "^7.1.3"
+    "vite": "^7.1.3",
+    "vitest": "^2.1.9"
   }
 }

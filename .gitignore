@@ -11,3 +11,14 @@ dist-ssr
 .env
 .env.*
 !.env.example
+
+# Firebase emulator + tooling artifacts
+*-debug.log
+ui-debug.log
+firebase-debug.log
+firestore-debug.log
+
+# Playwright
+/test-results/
+/playwright-report/
+/playwright/.cache/

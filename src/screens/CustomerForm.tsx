@@ -4,7 +4,9 @@ import { STRINGS } from "../lib/strings";
 import { Field, TextArea, TextInput } from "../forms/formFields";
 
 type Props = {
-  onSave: (customer: Pick<Customer, "name" | "phone" | "notes">) => void;
+  onSave: (
+    customer: Pick<Customer, "name" | "phone" | "notes">
+  ) => void | Promise<void>;
   onCancel: () => void;
 };
 
@@ -13,10 +15,23 @@ export const CustomerForm = ({ onSave, onCancel }: Props) => {
   const [phone, setPhone] = useState("");
   const [notes, setNotes] = useState("");
   const [error, setError] = useState("");
+  const [busy, setBusy] = useState(false);
 
-  const submit = () => {
+  const submit = async () => {
     if (!name.trim()) return setError(STRINGS.customerForm.errName);
-    onSave({ name: name.trim(), phone: phone.trim() || undefined, notes: notes.trim() || undefined });
+    setBusy(true);
+    setError("");
+    try {
+      await onSave({
+        name: name.trim(),
+        phone: phone.trim() || undefined,
+        notes: notes.trim() || undefined,
+      });
+    } catch {
+      setError(STRINGS.errors.save);
+    } finally {
+      setBusy(false);
+    }
   };
 
   return (
@@ -50,15 +65,17 @@ export const CustomerForm = ({ onSave, onCancel }: Props) => {
       <div className="flex gap-3 pt-1">
         <button
           onClick={onCancel}
+          disabled={busy}
           className="flex-1 rounded-xl border border-gray-300 bg-white py-3 text-base font-semibold text-gray-700 active:scale-[0.99] transition"
         >
           {STRINGS.customerForm.cancel}
         </button>
         <button
-          onClick={submit}
+          onClick={() => void submit()}
+          disabled={busy}
           className="flex-[2] rounded-xl bg-emerald-600 py-3 text-base font-semibold text-white active:scale-[0.99] transition"
         >
-          {STRINGS.customerForm.save}
+          {busy ? "Guardando..." : STRINGS.customerForm.save}
         </button>
       </div>
     </div>

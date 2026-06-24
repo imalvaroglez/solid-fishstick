@@ -15,40 +15,51 @@ import { db } from "../firebase/firestore";
 import { rethrowFirebaseError } from "../firebase/diagnostics";
 import type { Customer } from "../../types";
 
-const COL = "customers";
+// Legacy root collection (single-tenant) vs store-scoped subcollection (Store OS).
+// No storeId = legacy path, so the app keeps working during the transition.
+const col = (storeId?: string) =>
+  storeId ? `stores/${storeId}/customers` : "customers";
 
 type Listener = (customers: Customer[]) => void;
 
-export const subscribe = (cb: Listener): Unsubscribe =>
+export const subscribe = (cb: Listener, storeId?: string): Unsubscribe =>
   onSnapshot(
-    query(collection(db(), COL), orderBy("updatedAt", "desc")),
+    query(collection(db(), col(storeId)), orderBy("updatedAt", "desc")),
     (snap) => cb(snap.docs.map((d) => d.data() as Customer)),
     () => cb([])
   );
 
-export const save = async (customer: Customer): Promise<void> => {
+export const save = async (
+  customer: Customer,
+  storeId?: string
+): Promise<void> => {
   try {
-    await importCustomers([customer]);
+    await importCustomers([customer], storeId);
   } catch (error) {
-    rethrowFirebaseError("save", COL, customer.id, error);
+    rethrowFirebaseError("save", col(storeId), customer.id, error);
   }
 };
 
 // Non-destructive: skip ids that already exist.
-export const importCustomers = async (items: Customer[]): Promise<void> => {
+export const importCustomers = async (
+  items: Customer[],
+  storeId?: string
+): Promise<void> => {
   if (items.length === 0) return;
   const existing = new Set<string>();
   for (let i = 0; i < items.length; i += 30) {
     const chunk = items.slice(i, i + 30);
     const snap = await getDocs(
-      query(collection(db(), COL), where(documentId(), "in", chunk.map((c) => c.id)))
+      query(collection(db(), col(storeId)), where(documentId(), "in", chunk.map((c) => c.id)))
     );
     snap.forEach((d) => existing.add(d.id));
   }
-  const batch = writeBatch(db());
-  for (const c of items) {
-    if (existing.has(c.id)) continue;
-    batch.set(doc(db(), COL, c.id), c);
+  const pending = items.filter((c) => !existing.has(c.id));
+  for (let i = 0; i < pending.length; i += 400) {
+    const batch = writeBatch(db());
+    for (const c of pending.slice(i, i + 400)) {
+      batch.set(doc(db(), col(storeId), c.id), c);
+    }
+    await batch.commit();
   }
-  await batch.commit();
 };

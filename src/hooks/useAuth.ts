@@ -1,16 +1,22 @@
-// Admin auth state. One onAuthStateChanged subscription; admin check is atomic
-// to each emission so status never flickers between denied/admin.
+// Auth state. Store authorization is enforced by Firestore/Storage membership
+// rules rather than a client-side email gate.
 import { useEffect, useState } from "react";
 import { onAuthStateChanged, type User } from "firebase/auth";
-import { auth, signInWithEmail, signOutAdmin, isAdminEmail } from "../services/firebase/auth";
+import {
+  auth,
+  signInWithEmail,
+  signOutAdmin,
+  signUpWithEmail,
+} from "../services/firebase/auth";
 import { FirebaseConfigError } from "../services/firebase/app";
 
-export type AuthStatus = "loading" | "signedOut" | "denied" | "admin";
+export type AuthStatus = "loading" | "signedOut" | "authenticated";
 
 export const useAuth = (): {
   status: AuthStatus;
   user: User | null;
   signIn: (email: string, password: string) => Promise<void>;
+  signUp: (email: string, password: string) => Promise<void>;
   signOut: () => Promise<void>;
 } => {
   const [status, setStatus] = useState<AuthStatus>("loading");
@@ -24,7 +30,7 @@ export const useAuth = (): {
       unsub = onAuthStateChanged(auth(), (u) => {
         setUser(u);
         if (!u) return setStatus("signedOut");
-        setStatus(isAdminEmail(u.email) ? "admin" : "denied");
+        setStatus("authenticated");
       });
     } catch (e) {
       if (e instanceof FirebaseConfigError) setStatus("signedOut");
@@ -37,6 +43,7 @@ export const useAuth = (): {
     status,
     user,
     signIn: signInWithEmail,
+    signUp: signUpWithEmail,
     signOut: signOutAdmin,
   };
 };

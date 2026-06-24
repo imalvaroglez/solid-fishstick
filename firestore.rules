@@ -3,34 +3,196 @@ rules_version = '2';
 // ============================================================================
 // Firebase rules run server-side and CANNOT read Vite env vars, so the admin
 // list here must mirror VITE_ADMIN_EMAILS exactly.
+//
+// LAYOUT (Store OS):
+//   - LEGACY (kept through the transition): root products/customers/orders +
+//     publicCatalogProducts + settings, gated by the email allowlist below.
+//   - NEW (membership-gated, multi-store): stores/{storeId}/... subcollections,
+//     memberships, userMemberships, publicStores. All access resolved via
+//     get()/exists()/getAfter() reads — NO Cloud Functions.
+// Membership doc id is deterministic: storeId + "_" + uid, so rules can compute
+// the path without a query (rules cannot query).
 // ============================================================================
 
 service cloud.firestore {
   match /databases/{db}/documents {
 
-    // Admin Email/Password accounts — keep in sync with VITE_ADMIN_EMAILS
-    // (Firebase rules cannot read client env vars at runtime).
+    // --- LEGACY: admin allowlist (mirrors VITE_ADMIN_EMAILS) -----------------
     function isAdmin() {
       return request.auth != null
       && request.auth.token.email in [
-        "admin@mail.com"
+        "admin@mail.com",
+        "estebanchavez1709@gmail.com"
       ];
     }
 
-    // Private admin collections — only allowed admins read/write.
     match /products/{id}   { allow read, write: if isAdmin(); }
     match /customers/{id}  { allow read, write: if isAdmin(); }
     match /orders/{id}     { allow read, write: if isAdmin(); }
-
-    // Public catalog settings: anyone may read, only admins write.
     match /settings/{id}   { allow read: if true; allow write: if isAdmin(); }
-
-    // Public catalog products: world-readable (this is what /catalogo reads),
-    // admin-write only. These docs must contain ONLY safe public fields
-    // (never cost/profit/private notes) — see productRepository.toPublic().
     match /publicCatalogProducts/{id} {
       allow read:  if true;
       allow write: if isAdmin();
+    }
+
+    // --- NEW: membership resolution -----------------------------------------
+    // mId = storeId + "_" + request.auth.uid. exists() gates the get() (get()
+    // has no .exists; accessing .data on a missing doc errors). The && short-
+    // circuits, so non-members cost one exists() read; members cost exists+get.
+    function membershipDoc(storeId) {
+      return /databases/$(db)/documents/memberships/$(storeId + "_" + request.auth.uid);
+    }
+    // roleFor() returns the user's role for a store, or "" if they have none.
+    // Reading .data only after exists() avoids the missing-doc evaluation error.
+    function roleFor(storeId) {
+      let path = membershipDoc(storeId);
+      return exists(path)
+        && get(path).data.uid == request.auth.uid
+        && get(path).data.storeId == storeId
+        && get(path).data.status == "active"
+        ? get(path).data.role
+        : "";
+    }
+    function canWriteStore(storeId) {
+      return request.auth != null
+        && roleFor(storeId) in ["owner", "admin"];
+    }
+
+    // --- NEW: tenant private data -------------------------------------------
+    // Private subcollections are enumerated explicitly rather than via a
+    // {document=**} catch-all: a recursive wildcard would also match the
+    // publicProducts path and shadow its field guards. Listing each private
+    // collection is unambiguous and keeps publicProducts under its own block.
+    match /stores/{storeId}/products/{id}   { allow read, write: if canWriteStore(storeId); }
+    match /stores/{storeId}/customers/{id}  { allow read, write: if canWriteStore(storeId); }
+    match /stores/{storeId}/orders/{id}     { allow read, write: if canWriteStore(storeId); }
+
+    // --- NEW: public catalog projection (world-read, member-write) ----------
+    // Defense-in-depth: never persist private fields in the public doc.
+    match /stores/{storeId}/publicProducts/{id} {
+      allow read:  if true;
+      allow create, update: if canWriteStore(storeId)
+        && request.resource.data.keys().hasOnly([
+          "id",
+          "name",
+          "category",
+          "price",
+          "imageUrl",
+          "imagePath",
+          "description",
+          "isPublic",
+          "updatedAt"
+        ]);
+      allow delete: if canWriteStore(storeId);
+    }
+
+    // --- NEW: self-service store bootstrap ----------------------------------
+    // The client writes 4 docs in ONE atomic writeBatch:
+    //   stores/{storeId}, memberships/{storeId_uid},
+    //   userMemberships/{uid}/stores/{storeId}, publicStores/{slug}
+    // getAfter() sees the in-flight (post-batch, pre-commit) view, so each doc
+    // can validate against the others WITHIN the same batch.
+    match /stores/{storeId} {
+      allow read:   if canWriteStore(storeId);
+      // Every bootstrap document is mandatory. Each rule validates the same
+      // in-flight graph, so omitting any one write rejects the whole batch.
+      allow create: if request.auth != null
+        && request.resource.data.ownerId == request.auth.uid
+        && request.resource.data.id == storeId
+        && request.resource.data.slug.matches("^[a-z0-9]+(-[a-z0-9]+)*$")
+        && request.resource.data.slug.size() <= 40
+        && (storeId != "default" || isAdmin())
+        && getAfter(/databases/$(db)/documents/memberships/$(storeId + "_" + request.auth.uid)).data.uid == request.auth.uid
+        && getAfter(/databases/$(db)/documents/memberships/$(storeId + "_" + request.auth.uid)).data.storeId == storeId
+        && getAfter(/databases/$(db)/documents/memberships/$(storeId + "_" + request.auth.uid)).data.role == (storeId == "default" ? "admin" : "owner")
+        && getAfter(/databases/$(db)/documents/memberships/$(storeId + "_" + request.auth.uid)).data.status == "active"
+        && getAfter(/databases/$(db)/documents/userMemberships/$(request.auth.uid)/stores/$(storeId)).data.storeId == storeId
+        && getAfter(/databases/$(db)/documents/userMemberships/$(request.auth.uid)/stores/$(storeId)).data.role == (storeId == "default" ? "admin" : "owner")
+        && getAfter(/databases/$(db)/documents/publicStores/$(request.resource.data.slug)).data.storeId == storeId;
+      // Identity and routing are immutable in this first product.
+      allow update: if canWriteStore(storeId)
+        && request.resource.data.id == resource.data.id
+        && request.resource.data.ownerId == resource.data.ownerId
+        && request.resource.data.slug == resource.data.slug;
+      allow delete: if false;
+    }
+
+    match /memberships/{mId} {
+      // Read a single membership: a store owner/admin of that store, or the
+      // member themself. (No list: memberships is a flat collection with no
+      // storeId in the path, so a list can't be scoped — the app lists via
+      // userMemberships/{uid}/stores and gets individual docs here.)
+      allow get: if request.auth != null
+        && (canWriteStore(resource.data.storeId)
+             || resource.data.uid == request.auth.uid);
+      // Create your OWN owner membership, for a store being created in the same
+      // batch. getAfter validates the store doc exists and names you owner —
+      // prevents forging a role on someone else's store.
+      allow create: if request.auth != null
+        && (
+          (
+            mId == request.resource.data.storeId + "_" + request.auth.uid
+            && request.resource.data.uid    == request.auth.uid
+            && request.resource.data.role   == "owner"
+            && request.resource.data.status == "active"
+            && getAfter(/databases/$(db)/documents/stores/$(request.resource.data.storeId))
+                 .data.ownerId == request.auth.uid
+          )
+          ||
+          (
+            mId == "default_" + request.auth.uid
+            && request.resource.data.uid == request.auth.uid
+            && request.resource.data.storeId == "default"
+            && request.resource.data.role == "admin"
+            && request.resource.data.status == "active"
+            && isAdmin()
+            && getAfter(/databases/$(db)/documents/stores/default).data.id == "default"
+          )
+        );
+      // Invitations/member management are deliberately deferred.
+      allow update, delete: if false;
+    }
+
+    match /userMemberships/{uid}/stores/{storeId} {
+      // Client-listing index. You may only write/delete your OWN index row,
+      // and it must match the canonical membership (resolved via getAfter so the
+      // bootstrap batch validates end-to-end).
+      allow read:   if request.auth != null && uid == request.auth.uid;
+      allow create, update: if request.auth != null && uid == request.auth.uid
+        && request.resource.data.storeId == storeId
+        && getAfter(/databases/$(db)/documents/memberships/$(storeId + "_" + uid))
+             .data.uid == uid
+        && getAfter(/databases/$(db)/documents/memberships/$(storeId + "_" + uid))
+             .data.storeId == storeId
+        && getAfter(/databases/$(db)/documents/memberships/$(storeId + "_" + uid))
+             .data.status == "active"
+        && getAfter(/databases/$(db)/documents/memberships/$(storeId + "_" + uid))
+             .data.role == request.resource.data.role;
+      allow delete: if request.auth != null && uid == request.auth.uid;
+    }
+
+    // --- NEW: public storefront pointer (world-read, owner-write) -----------
+    // publicStores/{slug} = { storeId, ... }. The rule reads the asserted
+    // storeId from the written doc, then proves membership via getAfter (NOT
+    // get — the membership is in-flight during the bootstrap batch; using get
+    // would silently reject the whole batch).
+    match /publicStores/{slug} {
+      allow read:  if true;
+      allow create: if request.auth != null
+        && !exists(/databases/$(db)/documents/publicStores/$(slug))
+        && slug.matches("^[a-z0-9]+(-[a-z0-9]+)*$")
+        && slug.size() <= 40
+        && request.resource.data.keys().hasOnly([
+          "storeId",
+          "name",
+          "currency"
+        ])
+        && getAfter(/databases/$(db)/documents/stores/$(request.resource.data.storeId)).data.slug == slug
+        && getAfter(/databases/$(db)/documents/memberships/$(request.resource.data.storeId + "_" + request.auth.uid))
+             .data.status == "active"
+        && getAfter(/databases/$(db)/documents/memberships/$(request.resource.data.storeId + "_" + request.auth.uid))
+             .data.role == (request.resource.data.storeId == "default" ? "admin" : "owner");
+      allow update, delete: if false;
     }
 
     match /{document=**} {

@@ -8,6 +8,7 @@ import { uploadProductImage } from "../services/firebase/storage";
 
 type Props = {
   initial?: Product | null;
+  storeId: string;
   onSave: (product: Product) => void | Promise<void>;
   onCancel: () => void;
 };
@@ -19,7 +20,7 @@ const num = (raw: string): number => {
 
 const CATS: ProductCategory[] = ["perfume", "sneakers", "cap", "other"];
 
-export const ProductForm = ({ initial, onSave, onCancel }: Props) => {
+export const ProductForm = ({ initial, storeId, onSave, onCancel }: Props) => {
   // Stable id: reuse existing product id when editing, else generate once.
   const productIdRef = useRef<string>(initial?.id ?? id());
 
@@ -50,7 +51,7 @@ export const ProductForm = ({ initial, onSave, onCancel }: Props) => {
       let finalImageUrl = imageUrl;
       let finalImagePath = imagePath;
       if (pendingFile) {
-        const uploaded = await uploadProductImage(pendingFile, productIdRef.current);
+        const uploaded = await uploadProductImage(pendingFile, productIdRef.current, storeId);
         finalImageUrl = uploaded.imageUrl;
         finalImagePath = uploaded.imagePath;
       }

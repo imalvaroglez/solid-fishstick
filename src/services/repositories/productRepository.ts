@@ -15,8 +15,12 @@ import { db } from "../firebase/firestore";
 import { rethrowFirebaseError } from "../firebase/diagnostics";
 import type { Product, PublicCatalogProduct } from "../../types";
 
-const COL = "products";
-const PUBLIC_COL = "publicCatalogProducts";
+// Legacy root collection (single-tenant) vs store-scoped subcollection (Store OS).
+// No storeId = legacy path, so the app keeps working during the transition.
+const privateCol = (storeId?: string) =>
+  storeId ? `stores/${storeId}/products` : "products";
+const publicCol = (storeId?: string) =>
+  storeId ? `stores/${storeId}/publicProducts` : "publicCatalogProducts";
 
 // Project private Product -> public-safe shape. Never copy cost/profit/notes.
 const toPublic = (p: Product): PublicCatalogProduct => ({
@@ -34,19 +38,22 @@ const toPublic = (p: Product): PublicCatalogProduct => ({
 type ProductListener = (products: Product[]) => void;
 
 // Realtime feed of all products, newest first.
-export const subscribe = (cb: ProductListener): Unsubscribe =>
+export const subscribe = (
+  cb: ProductListener,
+  storeId?: string
+): Unsubscribe =>
   onSnapshot(
-    query(collection(db(), COL), orderBy("updatedAt", "desc")),
+    query(collection(db(), privateCol(storeId)), orderBy("updatedAt", "desc")),
     (snap) => cb(snap.docs.map((d) => d.data() as Product)),
     () => cb([])
   );
 
 // Batched: write private doc + upsert/delete the public projection.
-export const save = async (product: Product): Promise<void> => {
+export const save = async (product: Product, storeId?: string): Promise<void> => {
   try {
     const batch = writeBatch(db());
-    batch.set(doc(db(), COL, product.id), product);
-    const publicRef = doc(db(), PUBLIC_COL, product.id);
+    batch.set(doc(db(), privateCol(storeId), product.id), product);
+    const publicRef = doc(db(), publicCol(storeId), product.id);
     if (product.isPublic) {
       batch.set(publicRef, toPublic(product));
     } else {
@@ -56,7 +63,7 @@ export const save = async (product: Product): Promise<void> => {
   } catch (error) {
     rethrowFirebaseError(
       "save private/public projection",
-      `${COL},${PUBLIC_COL}`,
+      `${privateCol(storeId)},${publicCol(storeId)}`,
       product.id,
       error
     );
@@ -65,23 +72,31 @@ export const save = async (product: Product): Promise<void> => {
 
 // Non-destructive import: skip ids that already exist. Firestore `in` is capped
 // at 30 values per query, so chunk it.
-export const importProducts = async (items: Product[]): Promise<void> => {
+export const importProducts = async (
+  items: Product[],
+  storeId?: string,
+  includePublic = true
+): Promise<void> => {
   if (items.length === 0) return;
   const existing = new Set<string>();
   for (let i = 0; i < items.length; i += 30) {
     const chunk = items.slice(i, i + 30);
     const snap = await getDocs(
-      query(collection(db(), COL), where(documentId(), "in", chunk.map((p) => p.id)))
+      query(collection(db(), privateCol(storeId)), where(documentId(), "in", chunk.map((p) => p.id)))
     );
     snap.forEach((d) => existing.add(d.id));
   }
-  const batch = writeBatch(db());
-  for (const p of items) {
-    if (existing.has(p.id)) continue;
-    batch.set(doc(db(), COL, p.id), p);
-    if (p.isPublic) {
-      batch.set(doc(db(), PUBLIC_COL, p.id), toPublic(p));
+  const pending = items.filter((p) => !existing.has(p.id));
+  // At most two writes per product (private + public), safely below Firestore's
+  // 500-write batch cap.
+  for (let i = 0; i < pending.length; i += 200) {
+    const batch = writeBatch(db());
+    for (const p of pending.slice(i, i + 200)) {
+      batch.set(doc(db(), privateCol(storeId), p.id), p);
+      if (includePublic && p.isPublic) {
+        batch.set(doc(db(), publicCol(storeId), p.id), toPublic(p));
+      }
     }
+    await batch.commit();
   }
-  await batch.commit();
 };

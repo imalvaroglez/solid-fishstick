@@ -10,7 +10,9 @@ import { useAuth } from "../hooks/useAuth";
 
 type Props = {
   db: DB;
-  onAddCustomer: (c: Pick<Customer, "name" | "phone" | "notes">) => void;
+  onAddCustomer: (
+    c: Pick<Customer, "name" | "phone" | "notes">
+  ) => void | Promise<void>;
   onReset: () => void;
 };
 
@@ -44,8 +46,8 @@ export const CustomersScreen = ({ db, onAddCustomer, onReset }: Props) => {
     return (
       <div>
         <CustomerForm
-          onSave={(c) => {
-            onAddCustomer(c);
+          onSave={async (c) => {
+            await onAddCustomer(c);
             setAdding(false);
           }}
           onCancel={() => setAdding(false)}

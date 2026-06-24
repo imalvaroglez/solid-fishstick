@@ -14,7 +14,7 @@ export type DataStatus = "loading" | "ready" | "empty" | "error";
 
 const now = (): string => new Date().toISOString();
 
-export const useFirestoreStore = () => {
+export const useFirestoreStore = (storeId: string) => {
   const [products, setProducts] = useState<Product[]>([]);
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [orders, setOrders] = useState<Order[]>([]);
@@ -23,24 +23,26 @@ export const useFirestoreStore = () => {
   const seen = useRef({ products: false, customers: false, orders: false });
 
   useEffect(() => {
+    // Reset seen flags on store switch so dataStatus reflects the new store.
+    seen.current = { products: false, customers: false, orders: false };
     const unsubP = productRepo.subscribe((data) => {
       setProducts(data);
       seen.current.products = true;
-    });
+    }, storeId);
     const unsubC = customerRepo.subscribe((data) => {
       setCustomers(data);
       seen.current.customers = true;
-    });
+    }, storeId);
     const unsubO = orderRepo.subscribe((data) => {
       setOrders(data);
       seen.current.orders = true;
-    });
+    }, storeId);
     return () => {
       unsubP();
       unsubC();
       unsubO();
     };
-  }, []);
+  }, [storeId]);
 
   const allLoaded = seen.current.products && seen.current.customers && seen.current.orders;
 
@@ -89,14 +91,14 @@ export const useFirestoreStore = () => {
           phone: input.customerPhone?.trim() || undefined,
           createdAt: ts,
           updatedAt: ts,
-        });
-    return customerWrite.then(() => orderRepo.save(order));
+        }, storeId);
+    return customerWrite.then(() => orderRepo.save(order, storeId));
   };
 
   const advanceOrder = (orderId: string, nextStatus: OrderStatus) =>
-    orderRepo.advance(orderId, nextStatus);
+    orderRepo.advance(orderId, nextStatus, storeId);
 
-  const saveProduct = (product: Product) => productRepo.save(product);
+  const saveProduct = (product: Product) => productRepo.save(product, storeId);
 
   const addCustomer = (
     customer: Pick<Customer, "name" | "phone" | "notes">
@@ -109,7 +111,7 @@ export const useFirestoreStore = () => {
       notes: customer.notes,
       createdAt: ts,
       updatedAt: ts,
-    });
+    }, storeId);
   };
 
   // --- migration ---
@@ -128,17 +130,17 @@ export const useFirestoreStore = () => {
   const importLocalData = async () => {
     const local = storage.load();
     await Promise.all([
-      productRepo.importProducts(local.products),
-      customerRepo.importCustomers(local.customers),
-      orderRepo.importOrders(local.orders),
+      productRepo.importProducts(local.products, storeId),
+      customerRepo.importCustomers(local.customers, storeId),
+      orderRepo.importOrders(local.orders, storeId),
     ]);
   };
 
   const importSampleData = async () => {
     await Promise.all([
-      productRepo.importProducts(SEED_DB.products),
-      customerRepo.importCustomers(SEED_DB.customers),
-      orderRepo.importOrders(SEED_DB.orders),
+      productRepo.importProducts(SEED_DB.products, storeId),
+      customerRepo.importCustomers(SEED_DB.customers, storeId),
+      orderRepo.importOrders(SEED_DB.orders, storeId),
     ]);
   };
 

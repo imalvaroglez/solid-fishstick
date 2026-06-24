@@ -12,6 +12,11 @@ const AdminRoute = lazy(() =>
 
 export const router = createBrowserRouter([
   {
+    path: "/catalogo/:slug",
+    element: <PublicCatalogScreen />,
+  },
+  {
+    // Legacy: no slug → reads the default store's publicProducts.
     path: "/catalogo",
     element: <PublicCatalogScreen />,
   },

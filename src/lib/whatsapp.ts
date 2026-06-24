@@ -27,5 +27,5 @@ export const createWhatsAppProductUrl = (
 };
 
 // Public catalog URL at the current origin.
-export const publicCatalogUrl = (): string =>
-  `${window.location.origin}/catalogo`;
+export const publicCatalogUrl = (slug?: string): string =>
+  `${window.location.origin}/catalogo${slug ? `/${encodeURIComponent(slug)}` : ""}`;

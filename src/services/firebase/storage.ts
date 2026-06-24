@@ -3,9 +3,10 @@ import {
   ref,
   uploadBytes,
   getDownloadURL,
+  connectStorageEmulator,
   type FirebaseStorage,
 } from "firebase/storage";
-import { getFirebase } from "./app";
+import { getFirebase, useEmulator, EMULATOR_HOST } from "./app";
 import { rethrowFirebaseError } from "./diagnostics";
 import { id } from "../../lib/ids";
 
@@ -14,6 +15,9 @@ let cached: FirebaseStorage | null = null;
 const storage = (): FirebaseStorage => {
   if (cached) return cached;
   cached = getStorage(getFirebase());
+  if (useEmulator) {
+    connectStorageEmulator(cached, EMULATOR_HOST, 29196);
+  }
   return cached;
 };
 
@@ -53,19 +57,24 @@ export const resizeImage = (file: File): Promise<Blob> =>
 
 export type UploadedImage = { imageUrl: string; imagePath: string };
 
-// Uploads to product-images/{productId}/{id}.jpg, returns the download URL + path.
+// Uploads to stores/{storeId}/product-images/{productId}/{id}.jpg (Store OS) or
+// the legacy product-images/{productId}/{id}.jpg when no storeId is given.
 export const uploadProductImage = async (
   file: File,
-  productId: string
+  productId: string,
+  storeId?: string
 ): Promise<UploadedImage> => {
   const blob = await resizeImage(file);
-  const imagePath = `product-images/${productId}/${id()}.jpg`;
+  const dir = storeId
+    ? `stores/${storeId}/product-images/${productId}`
+    : `product-images/${productId}`;
+  const imagePath = `${dir}/${id()}.jpg`;
   const storageRef = ref(storage(), imagePath);
   try {
     await uploadBytes(storageRef, blob, { contentType: "image/jpeg" });
     const imageUrl = await getDownloadURL(storageRef);
     return { imageUrl, imagePath };
   } catch (error) {
-    return rethrowFirebaseError("upload", "product-images", imagePath, error);
+    return rethrowFirebaseError("upload", dir, imagePath, error);
   }
 };
