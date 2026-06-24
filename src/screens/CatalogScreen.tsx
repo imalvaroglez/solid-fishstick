@@ -11,10 +11,17 @@ import { ProductForm } from "./ProductForm";
 
 type Props = {
   db: DB;
-  onSaveProduct: (product: Product) => void;
+  storeId: string;
+  publicSlug: string;
+  onSaveProduct: (product: Product) => void | Promise<void>;
 };
 
-export const CatalogScreen = ({ db, onSaveProduct }: Props) => {
+export const CatalogScreen = ({
+  db,
+  storeId,
+  publicSlug,
+  onSaveProduct,
+}: Props) => {
   const [editing, setEditing] = useState<Product | null>(null);
   const [adding, setAdding] = useState(false);
   const [toast, setToast] = useState("");
@@ -29,7 +36,7 @@ export const CatalogScreen = ({ db, onSaveProduct }: Props) => {
       return;
     }
     try {
-      await navigator.clipboard.writeText(publicCatalogUrl());
+      await navigator.clipboard.writeText(publicCatalogUrl(publicSlug));
       setCopied(true);
       setToast(STRINGS.share.copied);
     } catch {
@@ -45,8 +52,9 @@ export const CatalogScreen = ({ db, onSaveProduct }: Props) => {
       <div>
         <ProductForm
           initial={editing}
-          onSave={(p) => {
-            onSaveProduct(p);
+          storeId={storeId}
+          onSave={async (p) => {
+            await onSaveProduct(p);
             setAdding(false);
             setEditing(null);
           }}
@@ -87,7 +95,7 @@ export const CatalogScreen = ({ db, onSaveProduct }: Props) => {
       {!copied && toast === STRINGS.share.copyFailed && (
         <input
           readOnly
-          value={publicCatalogUrl()}
+          value={publicCatalogUrl(publicSlug)}
           onFocus={(e) => e.currentTarget.select()}
           className="w-full rounded-xl border border-amber-300 bg-amber-50 px-3 py-2.5 text-sm text-gray-800"
         />

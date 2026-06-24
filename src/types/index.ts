@@ -93,3 +93,34 @@ export type NewOrderInput = {
   promisedDate?: string;
   notes?: string;
 };
+
+// ---- Store OS: multi-store membership model --------------------------------
+// storeId is immutable identity; slug is a separate, renameable routing field.
+// A membership maps a user (uid) to a store. Additional roles wait until a
+// real workflow needs them.
+export type StoreRole = "owner" | "admin";
+
+export type Store = {
+  id: string;
+  name: string;
+  slug: string;
+  ownerId: string;
+  currency: string;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type Membership = {
+  id: string;
+  uid: string;
+  storeId: string;
+  role: StoreRole;
+  status: "active";
+  createdAt: string;
+};
+
+// Lightweight client-listing index row (userMemberships/{uid}/stores/{storeId}).
+export type UserStoreMembership = {
+  storeId: string;
+  role: StoreRole;
+};

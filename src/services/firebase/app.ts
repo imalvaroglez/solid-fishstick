@@ -31,6 +31,12 @@ const isConfigured = Boolean(
 
 let cached: FirebaseApp | null = null;
 
+// True when the app should talk to the local Firebase emulator (e2e/dev).
+// Set VITE_USE_EMULATOR=1 in the dev environment to connect auth/firestore/storage
+// to localhost. Never set in production.
+export const useEmulator = env.VITE_USE_EMULATOR === "1";
+export const EMULATOR_HOST = "127.0.0.1";
+
 // Returns the initialized app, or throws a friendly Spanish error if unconfigured.
 export const getFirebase = (): FirebaseApp => {
   if (cached) return cached;

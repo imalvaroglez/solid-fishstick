@@ -1,4 +1,7 @@
 import { useEffect, useState } from "react";
+import { useParams } from "react-router-dom";
+import { doc, getDoc } from "firebase/firestore";
+import { db } from "../services/firebase/firestore";
 import type { PublicCatalogState } from "../services/repositories/publicCatalogRepository";
 import { STRINGS } from "../lib/strings";
 import { formatMoney } from "../lib/format";
@@ -16,15 +19,27 @@ const CATEGORY_LABEL = {
 } as const;
 
 const SELLER_PHONE = import.meta.env.VITE_PUBLIC_CATALOG_SELLER_PHONE ?? "";
-const BUSINESS_NAME = import.meta.env.VITE_PUBLIC_CATALOG_BUSINESS_NAME ?? STRINGS.appName;
+const ENV_BUSINESS_NAME = import.meta.env.VITE_PUBLIC_CATALOG_BUSINESS_NAME ?? STRINGS.appName;
 
 export const PublicCatalogScreen = () => {
+  // :slug from /catalogo/:slug. Absent on legacy /catalogo (default store).
+  const { slug } = useParams<{ slug?: string }>();
   const [state, setState] = useState<PublicCatalogState>({ status: "loading" });
+  const [businessName, setBusinessName] = useState(ENV_BUSINESS_NAME);
 
   useEffect(() => {
-    const unsub = publicCatalogRepo.subscribe(setState);
+    // Store-scoped when a slug is present; legacy root collection otherwise.
+    const target = slug ? { slug } : undefined;
+    const unsub = publicCatalogRepo.subscribe(setState, target);
+    // For a store-scoped catalog, read the storefront name from publicStores.
+    if (slug) {
+      getDoc(doc(db(), "publicStores", slug)).then((snap) => {
+        const name = (snap.data() as { name?: string } | undefined)?.name;
+        if (name) setBusinessName(name);
+      });
+    }
     return unsub;
-  }, []);
+  }, [slug]);
 
   // tri-state: loading / error (don't pretend it's empty) / ready
   if (state.status === "loading") {
@@ -49,7 +64,7 @@ export const PublicCatalogScreen = () => {
   return (
     <div className="min-h-screen bg-gray-50">
       <header className="bg-emerald-600 px-5 pb-5 pt-8 text-center text-white">
-        <h1 className="text-2xl font-bold">{BUSINESS_NAME}</h1>
+        <h1 className="text-2xl font-bold">{businessName}</h1>
         <p className="mt-1 text-sm text-emerald-50">
           {STRINGS.publicCatalog.title}
         </p>
@@ -91,7 +106,7 @@ export const PublicCatalogScreen = () => {
                     <p className="mt-1 text-sm text-gray-600">{p.description}</p>
                   )}
                   <a
-                    href={createWhatsAppProductUrl(p, SELLER_PHONE, BUSINESS_NAME)}
+                    href={createWhatsAppProductUrl(p, SELLER_PHONE, businessName)}
                     target="_blank"
                     rel="noopener noreferrer"
                     className="mt-3 flex w-full items-center justify-center gap-2 rounded-xl bg-emerald-600 py-3 text-base font-semibold text-white active:scale-[0.99] transition"

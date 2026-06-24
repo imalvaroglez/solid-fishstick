@@ -4,7 +4,7 @@ import { useAuth } from "../hooks/useAuth";
 import { STRINGS } from "../lib/strings";
 
 export const LoginScreen = () => {
-  const { signIn } = useAuth();
+  const { signIn, signUp } = useAuth();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [signingIn, setSigningIn] = useState(false);
@@ -18,6 +18,18 @@ export const LoginScreen = () => {
       await signIn(email.trim(), password);
     } catch {
       setError(STRINGS.auth.signInError);
+    } finally {
+      setSigningIn(false);
+    }
+  };
+
+  const onSignUp = async () => {
+    setError("");
+    setSigningIn(true);
+    try {
+      await signUp(email.trim(), password);
+    } catch {
+      setError("No se pudo crear la cuenta. Revisa los datos.");
     } finally {
       setSigningIn(false);
     }
@@ -56,6 +68,14 @@ export const LoginScreen = () => {
           className="flex w-full items-center justify-center rounded-2xl bg-emerald-600 px-5 py-3.5 text-base font-semibold text-white active:scale-[0.99] active:bg-emerald-700 transition disabled:opacity-60"
         >
           {signingIn ? STRINGS.auth.signingIn : STRINGS.auth.signIn}
+        </button>
+        <button
+          type="button"
+          onClick={() => void onSignUp()}
+          disabled={signingIn || !email.trim() || password.length < 6}
+          className="flex w-full items-center justify-center rounded-2xl border border-emerald-600 bg-white px-5 py-3.5 text-base font-semibold text-emerald-700 disabled:opacity-50"
+        >
+          Crear cuenta
         </button>
         {error && <p className="text-center text-sm font-medium text-red-600">{error}</p>}
       </form>

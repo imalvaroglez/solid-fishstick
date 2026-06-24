@@ -9,6 +9,8 @@ import { HomeScreen } from "../screens/HomeScreen";
 import { OrdersScreen } from "../screens/OrdersScreen";
 import { CatalogScreen } from "../screens/CatalogScreen";
 import { CustomersScreen } from "../screens/CustomersScreen";
+import { StoreSwitcher } from "../components/StoreSwitcher";
+import { useStore } from "./StoreProvider";
 import { STRINGS } from "../lib/strings";
 
 type ToastState = {
@@ -18,7 +20,9 @@ type ToastState = {
 } | null;
 
 export default function AdminApp() {
-  const store = useFirestoreStore();
+  const { activeStoreId, stores } = useStore();
+  // activeStoreId is always set by StoreProvider before AdminApp renders.
+  const store = useFirestoreStore(activeStoreId!);
   const [tab, setTab] = useState<Tab>("home");
   // Lets Home's "Nuevo pedido" jump straight into the order form.
   const [ordersFormOpen, setOrdersFormOpen] = useState(false);
@@ -73,6 +77,7 @@ export default function AdminApp() {
   return (
     <div className="mx-auto flex min-h-full max-w-md flex-col bg-gray-50">
       {store.dataStatus === "empty" && <MigrationBanner store={store} />}
+      <StoreSwitcher />
       <main className="flex-1 px-4 pb-28 pt-6">
         {tab === "home" && (
           <HomeScreen
@@ -96,17 +101,27 @@ export default function AdminApp() {
         {tab === "catalog" && (
           <CatalogScreen
             db={store.db}
-            onSaveProduct={(p) => {
-              store.saveProduct(p).catch(() => fail(STRINGS.errors.save));
-            }}
+            storeId={activeStoreId!}
+            publicSlug={
+              stores.find((item) => item.id === activeStoreId)?.slug ?? "default"
+            }
+            onSaveProduct={(p) =>
+              store.saveProduct(p).catch((error) => {
+                fail(STRINGS.errors.save);
+                throw error;
+              })
+            }
           />
         )}
         {tab === "customers" && (
           <CustomersScreen
             db={store.db}
-            onAddCustomer={(c) => {
-              store.addCustomer(c).catch(() => fail(STRINGS.errors.save));
-            }}
+            onAddCustomer={(c) =>
+              store.addCustomer(c).catch((error) => {
+                fail(STRINGS.errors.save);
+                throw error;
+              })
+            }
             onReset={() => void store.importSampleData()}
           />
         )}
