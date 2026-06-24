@@ -104,10 +104,10 @@ service cloud.firestore {
         && (storeId != "default" || isAdmin())
         && getAfter(/databases/$(db)/documents/memberships/$(storeId + "_" + request.auth.uid)).data.uid == request.auth.uid
         && getAfter(/databases/$(db)/documents/memberships/$(storeId + "_" + request.auth.uid)).data.storeId == storeId
-        && getAfter(/databases/$(db)/documents/memberships/$(storeId + "_" + request.auth.uid)).data.role == "owner"
+        && getAfter(/databases/$(db)/documents/memberships/$(storeId + "_" + request.auth.uid)).data.role == (storeId == "default" ? "admin" : "owner")
         && getAfter(/databases/$(db)/documents/memberships/$(storeId + "_" + request.auth.uid)).data.status == "active"
         && getAfter(/databases/$(db)/documents/userMemberships/$(request.auth.uid)/stores/$(storeId)).data.storeId == storeId
-        && getAfter(/databases/$(db)/documents/userMemberships/$(request.auth.uid)/stores/$(storeId)).data.role == "owner"
+        && getAfter(/databases/$(db)/documents/userMemberships/$(request.auth.uid)/stores/$(storeId)).data.role == (storeId == "default" ? "admin" : "owner")
         && getAfter(/databases/$(db)/documents/publicStores/$(request.resource.data.slug)).data.storeId == storeId;
       // Identity and routing are immutable in this first product.
       allow update: if canWriteStore(storeId)
@@ -146,7 +146,7 @@ service cloud.firestore {
             && request.resource.data.role == "admin"
             && request.resource.data.status == "active"
             && isAdmin()
-            && get(/databases/$(db)/documents/stores/default).data.id == "default"
+            && getAfter(/databases/$(db)/documents/stores/default).data.id == "default"
           )
         );
       // Invitations/member management are deliberately deferred.
@@ -191,7 +191,7 @@ service cloud.firestore {
         && getAfter(/databases/$(db)/documents/memberships/$(request.resource.data.storeId + "_" + request.auth.uid))
              .data.status == "active"
         && getAfter(/databases/$(db)/documents/memberships/$(request.resource.data.storeId + "_" + request.auth.uid))
-             .data.role == "owner";
+             .data.role == (request.resource.data.storeId == "default" ? "admin" : "owner");
       allow update, delete: if false;
     }
 

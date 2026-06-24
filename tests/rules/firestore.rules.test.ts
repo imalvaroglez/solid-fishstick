@@ -62,6 +62,10 @@ function bootstrapBatch(
 ) {
   const { storeId, slug, ownerId = uid, omit } = opts;
   const now = new Date().toISOString();
+  // The default store is a shared migrated store claimed with role "admin";
+  // all other stores are self-created with role "owner". Mirrors production:
+  // backfillDefaultStore writes "admin", storeRepository.createStore writes "owner".
+  const role = storeId === "default" ? "admin" : "owner";
   const batch = db.batch();
   if (omit !== "store") {
     batch.set(db.doc(`stores/${storeId}`), {
@@ -71,12 +75,12 @@ function bootstrapBatch(
   }
   if (omit !== "membership") {
     batch.set(db.doc(`memberships/${storeId}_${uid}`), {
-      uid, storeId, role: "owner", status: "active", createdAt: now,
+      uid, storeId, role, status: "active", createdAt: now,
     });
   }
   if (omit !== "index") {
     batch.set(db.doc(`userMemberships/${uid}/stores/${storeId}`), {
-      role: "owner", storeId,
+      role, storeId,
     });
   }
   if (omit !== "public") {

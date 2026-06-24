@@ -11,7 +11,7 @@ export function bootstrapStore(
   uid: string,
   opts: { storeId: string; slug: string; ownerId?: string; role?: string }
 ) {
-  const { storeId, slug, ownerId = uid, role = "owner" } = opts;
+  const { storeId, slug, ownerId = uid, role = storeId === "default" ? "admin" : "owner" } = opts;
   const batch = db.batch();
   batch.set(db.doc(`stores/${storeId}`), {
     id: storeId,

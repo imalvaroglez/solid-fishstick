@@ -152,4 +152,37 @@ describe("migration: legacy → store-scoped", () => {
     // memberships list is intentionally not allowed (no storeId in the path to
     // scope a list); the app lists via userMemberships, so we assert via get.
   });
+
+  // Regression guard: backfillDefaultStore's REAL production batch shape — the
+  // default store claimed by a legacy admin with role "admin" (not "owner"),
+  // in one atomic writeBatch. This is the shape that shipped broken (role
+  // deadlock + a get() that couldn't see the in-flight store doc). The earlier
+  // test above substitutes bootstrapStore (role owner) and so never exercised
+  // the default-claim rules branch; this one writes the real shape.
+  test("real backfillDefaultStore batch (role admin) validates under rules", async () => {
+    const db = env.authenticatedContext("admin-uid", { email: ADMIN_EMAIL }).firestore();
+    const ts = "2026-06-24T00:00:00.000Z";
+    const batch = db.batch();
+    batch.set(db.doc("stores/default"), {
+      id: "default", name: "Tienda", slug: "default",
+      ownerId: "admin-uid", currency: "MXN",
+      createdAt: ts, updatedAt: ts,
+    });
+    batch.set(db.doc("memberships/default_admin-uid"), {
+      uid: "admin-uid", storeId: "default",
+      role: "admin", status: "active", createdAt: ts,
+    });
+    batch.set(db.doc("userMemberships/admin-uid/stores/default"), {
+      storeId: "default", role: "admin",
+    });
+    batch.set(db.doc("publicStores/default"), {
+      storeId: "default", name: "Tienda", currency: "MXN",
+    });
+    await assertSucceeds(batch.commit());
+
+    // The admin membership grants full access to the migrated store's data.
+    expect((await adminDb().doc("stores/default").get()).exists).toBe(true);
+    await assertSucceeds(adminDb().collection("stores/default/products").get());
+    await assertSucceeds(adminDb().collection("stores/default/orders").get());
+  });
 });

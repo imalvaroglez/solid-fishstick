@@ -137,13 +137,13 @@ export const backfillDefaultStore = async (uid: string): Promise<Store> => {
   batch.set(doc(db(), "memberships", `${DEFAULT_STORE_ID}_${uid}`), {
     uid,
     storeId: DEFAULT_STORE_ID,
-    role: "owner",
+    role: "admin",
     status: "active",
     createdAt: ts,
   });
   batch.set(doc(db(), "userMemberships", uid, "stores", DEFAULT_STORE_ID), {
     storeId: DEFAULT_STORE_ID,
-    role: "owner",
+    role: "admin",
   });
   batch.set(doc(db(), "publicStores", DEFAULT_SLUG), {
     storeId: DEFAULT_STORE_ID,

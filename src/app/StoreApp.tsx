@@ -11,7 +11,6 @@ import {
   isAdminEmail,
   LEGACY_ADMIN_UIDS,
 } from "../services/firebase/auth";
-import { useEmulator } from "../services/firebase/app";
 
 const StoreShell = () => {
   const { stores, activeStoreId, loading } = useStore();
@@ -28,8 +27,8 @@ export const StoreApp = () => {
     <StoreProvider
       uid={user.uid}
       canMigrateLegacy={
-        LEGACY_ADMIN_UIDS.includes(user.uid)
-        || (useEmulator && isAdminEmail(user.email))
+        isAdminEmail(user.email)
+        || LEGACY_ADMIN_UIDS.includes(user.uid)
       }
     >
       <StoreShell />
